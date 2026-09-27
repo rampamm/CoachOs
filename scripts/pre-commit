@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# Blocks a commit if any staged file *contains* what looks like a private key
+# or a Google service-account credential — regardless of filename, and even
+# if .gitignore was bypassed with `git add -f`.
+#
+# This is a local git hook, not versioned by git itself. Install it with:
+#   cp scripts/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+# (every clone of this repo needs to run that once — see docs/refinement-plan.md)
+
+set -euo pipefail
+
+violations=""
+
+# Only scan files that are actually staged for commit.
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+
+for f in $staged_files; do
+  # Skip files that no longer exist on disk (e.g. staged deletions).
+  [ -f "$f" ] || continue
+
+  # Skip this hook's own script — it necessarily contains the detection
+  # patterns as literal text, which would otherwise flag itself every time.
+  case "$f" in
+    scripts/pre-commit|.git/hooks/pre-commit) continue ;;
+  esac
+
+  if grep -qE '"type"[[:space:]]*:[[:space:]]*"service_account"' "$f" 2>/dev/null \
+     || grep -q -- '-----BEGIN PRIVATE KEY-----' "$f" 2>/dev/null \
+     || grep -q -- '-----BEGIN RSA PRIVATE KEY-----' "$f" 2>/dev/null; then
+    violations="${violations}  - ${f}\n"
+  fi
+done
+
+if [ -n "$violations" ]; then
+  echo "──────────────────────────────────────────────────────────────" >&2
+  echo " COMMIT BLOCKED: possible private key / service-account credential" >&2
+  echo " found in staged content, regardless of filename:" >&2
+  echo -e "$violations" >&2
+  echo " If this is a false positive, use 'git commit --no-verify' to bypass." >&2
+  echo " If it's real: unstage it (git restore --staged <file>), keep the key" >&2
+  echo " outside the repo, and never commit it." >&2
+  echo "──────────────────────────────────────────────────────────────" >&2
+  exit 1
+fi
+
+exit 0

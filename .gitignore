@@ -1,0 +1,31 @@
+# Secrets — never commit
+.env
+service_account.json
+*.pem
+*.key
+
+# Local database
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# Python
+myenv/
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+#docs
+docs/
+
+#prototype
+prototype/
+
